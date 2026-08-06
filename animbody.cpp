@@ -337,6 +337,48 @@ void applyBodyKeyframe(const bodyKeyframe& key,std::vector<linealBezier>& fullbo
         dst.update();
     }
 }
+void autoSaveKeyframe(sf::RectangleShape& current_market, 
+                      sf::CircleShape& elipce, 
+                      std::vector<sf::RectangleShape>& listaKeyframes, 
+                      std::vector<posElipceData>& elipceData, 
+                      std::vector<bodyKeyframe>& keyPartData, 
+                      const std::vector<linealBezier>& fullbody) 
+{
+    auto pos = current_market.getPosition(); 
+    auto posElipce = elipce.getPosition(); 
+    
+    // Buscar si ya existe la elipse en este frame
+    auto it = std::find_if(elipceData.begin(), elipceData.end(),
+        [pos](const posElipceData& p){ return p.frame == pos.x;}
+    ); 
+
+    // Buscar si ya existe el bodyKeyframe en este frame
+    auto kBody = std::find_if(
+        keyPartData.begin(),
+        keyPartData.end(),
+        [pos](const bodyKeyframe& k)
+        {
+            return k.frame == pos.x;
+        });
+
+    // Actualizar o insertar el keyframe del cuerpo
+    if (kBody != keyPartData.end()){
+        kBody->capture(pos.x, fullbody);
+    } else {
+        bodyKeyframe key;
+        key.capture(pos.x, fullbody);
+        keyPartData.push_back(std::move(key));
+    }
+
+    // Actualizar o insertar el keyframe de la elipse
+    if (it != elipceData.end()){
+        it->x = posElipce.x;
+        it->y = posElipce.y;
+    } else {
+        listaKeyframes.push_back(createKeyframe(pos.x - 1));
+        elipceData.push_back({posElipce.x, posElipce.y, pos.x});
+    }
+}
 int main(){
     float altura = 640.f;
     float ancho = 360.f;
@@ -461,6 +503,7 @@ int main(){
     int movMode = 4;
     bool movEjeX = true;
     bool hipMove = false;
+    bool autoKeyEnabled = false;
     linealBezier* preSelect = &fullbody[4];
     selectedLinea = &fullbody[4];   // Spine
     selectedLinea->isSelected = true;
@@ -567,6 +610,11 @@ int main(){
                             }
                         }
                         selectedLinea->update();
+                        if (autoKeyEnabled){
+                            autoSaveKeyframe(current_market , elipce , listaKeyframes ,
+                                elipceData, keyPartData, fullbody
+                            );
+                        }                      
                     }else if (movMode == 2){
                         //rot handless
                         if (selectedLinea->selectedPoint == &selectedLinea->pUp){
@@ -577,6 +625,12 @@ int main(){
                             selectedLinea->rotBottom+= rotationStep;
                         }
                         selectedLinea->update();
+                        
+                        if (autoKeyEnabled){
+                            autoSaveKeyframe(current_market , elipce , listaKeyframes ,
+                                elipceData, keyPartData, fullbody
+                            );
+                        }                      
                     }else if (movMode == 3){
                         if (selectedLinea->selectedPoint == &selectedLinea->pUp){
                             selectedLinea->kUp += tangentStep;
@@ -586,6 +640,11 @@ int main(){
                             selectedLinea->kBottom+= tangentStep;
                         }
                         selectedLinea->update();
+                        if (autoKeyEnabled){
+                            autoSaveKeyframe(current_market , elipce , listaKeyframes ,
+                                elipceData, keyPartData, fullbody
+                            );
+                        }                      
                     }
                 }else if(event.key.code == sf::Keyboard::BackSpace){
                     if (movMode == 4){
@@ -734,6 +793,11 @@ int main(){
                         bodyPart.pBottom.pos.x -= forceValue;  // Mueve también el final
                         bodyPart.update(); 
                     }
+                    if (autoKeyEnabled){
+                        autoSaveKeyframe(current_market , elipce , listaKeyframes ,
+                            elipceData, keyPartData, fullbody
+                        );
+                    }
                 }else if (event.key.code == sf::Keyboard::Right){
                     auto pos= elipce.getPosition(); 
                     elipce.setPosition(pos.x + forceValue, pos.y);
@@ -743,7 +807,11 @@ int main(){
                         bodyPart.pBottom.pos.x += forceValue;  // Mueve también el final
                         bodyPart.update(); 
                     }
-                    
+                    if (autoKeyEnabled){
+                        autoSaveKeyframe(current_market , elipce , listaKeyframes ,
+                            elipceData, keyPartData, fullbody
+                        );
+                    }
                 }else if (event.key.code == sf::Keyboard::Up){
                     auto pos= elipce.getPosition(); 
                     elipce.setPosition(pos.x, pos.y- forceValue);
@@ -752,6 +820,11 @@ int main(){
                         bodyPart.pCenter.pos.y -= forceValue;   // Mueve también el centro
                         bodyPart.pBottom.pos.y -= forceValue;  // Mueve también el final
                         bodyPart.update(); 
+                    }
+                    if (autoKeyEnabled){
+                        autoSaveKeyframe(current_market , elipce , listaKeyframes ,
+                            elipceData, keyPartData, fullbody
+                        );
                     }
                 }else if (event.key.code == sf::Keyboard::Down){
                      auto pos= elipce.getPosition(); 
@@ -764,6 +837,12 @@ int main(){
                          
                           bodyPart.update(); // 💡 CRUCIAL: Aplica los cambios geométricos
                       }
+                    if (autoKeyEnabled){
+                        autoSaveKeyframe(current_market , elipce , listaKeyframes ,
+                            elipceData, keyPartData, fullbody
+                        );
+                    }                      
+                    
                 }else if (event.key.code == sf::Keyboard::F){
                      blinkKeyframe = true;
                 }else if (event.key.code == sf::Keyboard::C){
@@ -897,6 +976,20 @@ int main(){
                         viewMensajeInfo = true;
                     }else{
                         viewMensajeInfo = false;
+                    }
+                }else if (event.key.code == sf::Keyboard::F2){
+                    if (autoKeyEnabled == false){
+                        autoKeyEnabled = true;
+                        ss.str("");
+                        ss.clear();
+                        ss<<"autoKey : " << "activado"; 
+                        setMensajeTime(ss, timeMensaje , viewTimeMensaje, mensajeClock);
+                    }else{
+                        autoKeyEnabled = false;
+                        ss.str("");
+                        ss.clear();
+                        ss << "autoKey : " << "desactivado"; 
+                        setMensajeTime(ss, timeMensaje , viewTimeMensaje, mensajeClock);
                     }
                 }else if (event.key.code == sf::Keyboard::D){
                     selectedLinea = &fullbody[4];
