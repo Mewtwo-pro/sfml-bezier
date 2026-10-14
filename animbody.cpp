@@ -5,7 +5,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cmath>
-
+//salidaa
 void setMensajeTime (std:: stringstream& ss , sf::Text& timeMensaje,
     bool& viewTimeMensaje , sf::Clock& mensajeClock){
         timeMensaje.setString(ss.str());
